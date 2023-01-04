@@ -1,0 +1,170 @@
+---
+title: "ME115 - Linguagem R"
+author: "Camila Sayaka Hiura"
+date: ""
+output:
+  pdf_document: default
+  html_document: default
+subtitle: "Atividade 04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+<!-- Fonte: https://4va.github.io/biodatasci/r-dplyr-yeast.html#review -->
+
+```{r}
+# Carregar pacotes dplyr e readr
+library(dplyr)
+library(readr)
+
+# Leitura dos dados
+getwd()
+ydat <- read_csv('brauer2007_tidy.csv')
+```
+
+```{r}
+# Visualizar os dados
+ydat
+# Semelhante ao str(), mas uma versão melhorada
+glimpse(ydat)
+# Opcionalmente, visualize os dados numa janela nova
+View(ydat)
+```
+
+## Exercícios
+
+1. Selecione os dados onde o processo biológico da ontologia genética (a variável `bp`) é a “biossíntese de leucina” (leucine biosynthesis) e o nutriente restrito foi a Leucina (Leucine). Armazene sua resposta em um novo dataframe `leudat`, que deve ser uma tabela de 24 x 7. Quantos genes resultantes e quantas taxas de crescimento distintas temos nesse subconjunto?
+
+    ```{r, eval=FALSE}
+    leudat <- ydat %>% filter(nutrient=="Leucine", bp=='leucine biosynthesis')
+    leudat
+    ```
+    
+    ```{r, eval=FALSE}
+    # Quantos genes resultantes e quantas taxas de crescimento distintas temos nesse subconjunto?
+    leudat %>% summarize(n_distinct(symbol)) # genes
+    leudat %>% summarize(n_distinct(rate)) # taxas
+    ```
+
+2. Ordene os dados acima por gene e taxa de crescimento. Dica: use o verbo `arrange()`.
+
+    ```{r, eval=FALSE}
+    leudat %>% arrange(symbol, rate)
+    ```
+
+
+3. Considerando os dados originais `ydat`, use o verbo `summarize()` para obter as seguintes estatísticas:
+
+    * nobs: o número de observações 
+    * ngenes: o número de genes distintos (`symbol`)
+    * meanexp: a expressão média para todos os genes 
+    * r: correlação entre taxa e expressão (`rate` e `expression`)
+
+    ```{r, eval=FALSE}
+    ydat %>% summarise(
+		nobs    = n(),                    
+		ngenes  = length(unique(symbol)), 
+		meanexp = mean(expression),
+		r       = cor(rate, expression)
+	)
+    ```
+
+4. Crie um novo objeto chamado `nogo` que **não** contenha as anotações GO (colunas `bp` e `mf`). Dica: use o verbo `select()`.
+
+    ```{r, eval=FALSE}
+    # crie um novo conjunto de dados sem as anotações go.
+    nogo <- ydat %>% select(-(bp:mf))
+    nogo
+    ```
+
+    Veja como os dados originais `ydat` estão inalterados. Mude para eval=TRUE`. 
+
+    ```{r, eval=TRUE}
+    ydat
+    ```
+
+
+5. O nível de expressão relatado aqui é o $log_2$ do sinal bruto. Para os dados `nogo`, adicione uma nova variável chamada `signal`, que é a taxa real do sinal bruto em vez do sinal na escala logarítmica. Dica: use o verbo `mutate()`.
+
+    ```{r, eval=FALSE}
+    nogo <- nogo %>% mutate(signal = 2^expression)
+    nogo
+    ```
+
+
+6. O verbo `mutate()` também tem um pequeno recurso interessante, pois é "preguiçoso". Você pode alterar e adicionar uma variável e, em seguida, criar mais variáveis com base nessa variável que você acabou de adicionar, no mesmo comando. Então, repita o comando acima, mas agora crie também uma outra coluna chamada `sigsr` que seja a raiz quadrada da relação do sinal.
+
+    ```{r, eval=FALSE}
+    nogo = nogo %>% mutate(signal = 2^expression, sigsr = sqrt(signal)) 
+    ```
+
+
+7. Suponha que quiséssemos obter a correlação entre a taxa de crescimento e expressão, separadamente para cada nutriente que foi restrito, apenas para genes na via de biossíntese de leucina. O resultado deve ser uma tabela ordenada desses coeficientes de correlação arredondados com duas casas decimais. Mentalmente faríamos algo assim:
+
+    * Pegue o conjunto de dados ydat
+    * então filter() para genes na via de biossíntese de leucina
+    * então group_by() o nutriente restrito
+    * então summarize() para obter a correlação (`cor()`) entre taxa de crescimento e expressão
+    * então mutate() para arredondar as correlações com duas casas decimais
+    * então arrange() pelo coeficiente de correlação
+    
+    Isso é executado pelo seguinte código:
+    
+    ```{r}
+    arrange(
+      mutate(
+        summarize(
+          group_by(
+            filter(ydat, bp=="leucine biosynthesis"), 
+            nutrient), 
+        r=cor(rate, expression)), 
+      r=round(r, 2)), 
+    r)
+    ```
+
+    O código pode ficar muito mais elegante usando o operador `%>%`! Reescreva o código acima usando pipe. Basicamente você deve trocar todos os "então" da descrição do problema pelo símbolo `%>%`.
+
+    ```{r, eval=FALSE}
+    ## Complete o código abaixo
+    ydat %>% 
+      filter(bp=='leucine biosynthesis') %>% 
+      group_by(nutrient=="Leucine") %>%
+      summarize(r=cor(rate, expression)) %>%
+      mutate(round(r,2)) %>%
+      arrange(r)
+      
+    ```
+
+8. Mostre os nutrientes e valores de expressão para o gene ADH2 quando a taxa de crescimento é 0.05. Dica: verbos `filter()` e `select()`.
+    ```{r, eval=FALSE}
+    ydat %>% 
+      filter(symbol=='ADH2', rate==0.05) %>%
+      select(nutrient, expression)
+    ```
+
+9. Quais são os quatro genes mais expressos quando a taxa de crescimento é 0.05 e a glicose é o nutriente restrito? Mostrar apenas o símbolo, o valor da expressão e os termos GO. Dica: `filter()`, `arrange()`, `slice_max()` e `select()`.
+    ```{r, eval=FALSE}
+    ydat %>%
+		filter(rate == .05, nutrient == "Glucose") %>%
+		select(symbol, expression, bp, mf) %>% 
+		top_n(4, expression) %>% 
+		arrange(desc(expression))
+    
+    ```
+
+10. Quando a taxa de crescimento é 0.05, qual é o nível médio de expressão em todos os genes no processo biológico de "resposta ao estresse" (response to stress), separadamente para cada nutriente restrito? E quanto aos genes no processo biológico da "biossíntese de proteínas" (protein biosynthesis)? Dica: `filter()`, `group_by()`, `summarize()`.
+    ```{r, eval=FALSE}
+    ydat %>% 
+      filter(rate==0.05, bp=="response to stress") %>%
+      group_by(nutrient) %>%
+      summarise(nível_médio_de_expressão=mean(expression))
+    ```
+
+    ```{r, eval=FALSE}
+    ydat %>% 
+      filter(rate==0.05, bp=="protein biosynthesis") %>%
+      group_by(nutrient) %>%
+      summarise(nível_médio_de_expressão=mean(expression))
+    ```
