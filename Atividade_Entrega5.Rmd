@@ -1,0 +1,197 @@
+---
+title: "ME115 - Linguagem R"
+author: "Camila Sayaka Hiura"
+date: ''
+output:
+  pdf_document: default
+  html_document: default
+subtitle: Atividade 05 - 17/06/2021
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+
+# Visualização de Dados usando `ggplot2`
+
+
+### Leitura dos Dados
+
+```{r, eval=FALSE}
+# Carregar pacotes dplyr e readr
+library(dplyr)
+library(readr)
+
+# Leitura dos dados
+ydat <- read_csv('brauer2007_tidy.csv')
+```
+
+
+## Exercícios
+
+Os gráficos abaixo deverão ser feitos usando o pacote `ggplot2`.
+```{r}
+install.packages('ggplot2')
+```
+```{r}
+library(ggplot2)
+```
+
+
+### Parte 1
+
+Vamos começar olhando a distribuição dos valores da expressão (`expression`).
+
+1. Faça um histograma da variável que representa a expressão gênica e escolha o número de bins igual a 80. Escolha cores das linhas e preenchimento de sua preferência. O que o eixo `y` representa? Esse histograma se parece com alguma distribuição conhecida?
+```{r}
+ggplot(data = ydat) +
+  geom_histogram(aes(x = expression), bins = 80, fill = 2, color = 7) +
+  labs(title = "Histograma", x = "Expressão Gênica", y = "Frequência")
+```
+Resposta: O eixo y representa a frequência. O gráfico se assemelha à uma distribuicão normal.
+
+2. Refaça o histograma acima, mas agora o eixo `y` deve ser a frequência relativa (probabilidade). Ajuste os limites do eixo `x` de -3 a 3. Por fim, adicione uma curva de densidade a esse histograma.
+
+```{r}
+ggplot(data = ydat, aes(x = expression)) +
+  geom_histogram(aes(y = ..density..), bins = 80, fill = 2, color = 7) +
+  geom_density(stat = "density", color = 1) +
+  coord_cartesian(xlim = c(-3,3)) +
+  labs(title = "Histograma", x = "Expressão Gênica", y = "Frequência Relativa")
+```
+
+
+3. Repita o histograma do item (a), mas escolha o preenchimento de acordo com o nutriente, ou seja, use `fill = nutrient` dentro do `aes`. Essa é uma boa maneira de visualizar a distribuição da expressão por nutriente? Comente.
+```{r}
+ggplot(data = ydat) +
+  geom_histogram(aes(x = expression, fill = nutrient), 
+                 bins = 80, color = 10) +
+  labs(title = "Histograma", x = "Expressão Gênica", 
+       y = "Frequência", fill = "Nutriente")
+```
+Resposta: Como é uma análise para uma combinação de uma variável contínua(expression) e uma variável categórica(nutrient), uma boa maneira de visualização seria uma representação em boxplot por categoria.
+
+4. Separe os histogramas por nutrientes usando `facets` com 3 colunas. **Dica:** Use facet_wrap()'. 
+```{r}
+ggplot(data = ydat) +
+  geom_histogram(aes(x = expression, fill = nutrient), 
+                 bins = 80, color = 10) +
+  coord_cartesian(xlim = c(-3,3)) +
+  labs(title="Histograma", x="Expressão Gênica", 
+       y="Frequência ", fill = "Nutriente") +
+  facet_wrap(~nutrient)
+```
+
+
+
+### Parte 2
+
+Vamos comparar os genes com valores de expressão médio mais altos e mais baixos.
+
+Para extrair essas informações dos dados, use as funções do `dplyr` e `%>%`, seguindo a seguinte lógica:
+
+1. Pegue o conjunto de dados original `ydat`;
+2. Agrupe por símbolo (`symbol`);
+3. Use `summarize()` para calcular a média da expressão para cada símbolo;
+4. Use `arrange()` para colocar as médias em ordem decrescente;
+5. Filtre a primeira ou a última linha.
+
+```{r}
+ydat %>% 
+  group_by(symbol) %>% 
+  summarise(media_expressao = mean(expression)) %>%
+  arrange(desc(media_expressao)) %>%
+  filter(row_number()==1 | row_number()==n())
+```
+
+Quais são os genes com expressão média mais alta e mais baixa?
+Resposta: O gene com expressão média mais alta é HXT3 e o gene com expressão média mais baixa é HXT6.
+
+5. Extraia um subconjunto dos dados que contenha apenas os genes encontrados no item anterior. Faça um gráfico de pontos com os genes no eixo x e a expressão no eixo y, com as cores dos pontos variando de acordo com o nutriente e o tamanho dos pontos igual a 2. **Dica:** Para que os pontos não fiquem sobrepostos, você pode alterar a posição dos pontos no `geom_point()` usando `position = "jitter"` ou usando `geom_jitter()` diretamente. Experimente `width = 0.2`.
+
+```{r}
+ydat %>% filter(symbol %in% c("HXT3", "HXT6")) %>% 
+		ggplot(aes(x = symbol, y = expression, col = nutrient)) +
+			geom_jitter(size = 2, width = .2)
+
+```
+
+O que você nota em relação à glicose?
+
+A expressão da glicose parece ser igual (não é afetada) para os dois genes.
+
+### Parte 3
+
+6. Usando `dplyr`, crie um data frame com as médias da expressão para toda combinação de taxa (`rate`) e nutriente (`nutrient`). **Dica:** use `group_by()` e `summarize()`. 
+```{r}
+novo <- ydat %>% 
+  group_by(nutrient, rate) %>%
+  summarise(mean_expression = mean(expression))
+
+novo
+```
+
+
+a) Faça um gráfico desses dados com a taxa no eixo x e a expressão média no eixo y. As linhas devem ser coloridas de acordo com o nutriente.
+```{r}
+novo %>% 
+  ggplot(aes(x = rate, y = mean_expression, color = nutrient)) +
+  geom_line() 
+```
+
+
+b) Adicione uma linha pontilhada preta (`lty = 3`) que representa a expressão média suavizada para todas as combinações de nutrientes e taxas. 
+```{r}
+novo %>% 
+  ggplot(aes(x = rate, y = mean_expression, color = nutrient)) +
+  geom_line() +
+  geom_smooth(aes(x = rate, y = mean_expression), 
+            lty = 3, se = FALSE, color = 'black')
+```
+
+    
+c) Mude o eixo x para escala contínua incluindo todos os possíveis valores de taxa (`rate`). **Dica:** `scale_x_continuous()`. 
+```{r}
+novo %>% 
+  ggplot(aes(x = rate, y = mean_expression, color = nutrient)) +
+  geom_line() +
+  geom_smooth(aes(x = rate, y = mean_expression), 
+            lty = 3, se = FALSE, color = 'black') +
+  scale_x_continuous(breaks = seq(0.05, 0.3, by=0.05))
+```
+
+
+d) Mude o título do eixo x para "Taxa" e o nome do eixo y para "Expressão Média". Altere também o título do gráfico para "Expressão Média por Taxa (Brauer)".
+```{r}
+novo %>% 
+  ggplot(aes(x = rate, y = mean_expression, color = nutrient)) +
+  geom_line() +
+  geom_smooth(aes(x = rate, y = mean_expression), 
+            lty = 3, se = FALSE, color = 'black') +
+  scale_x_continuous(breaks = seq(0.05, 0.3, by=0.05)) +
+  labs(title = "Expressão Média por Taxa (Brauer)", x = "Taxa", 
+       y = "Expressão Média", color = "Nutriente")
+```
+
+
+e) Altere o tema do gráfico para algo da sua preferência que não seja o default.
+```{r}
+novo %>% 
+  ggplot(aes(x = rate, y = mean_expression, color = nutrient)) +
+  geom_line() +
+  geom_smooth(aes(x = rate, y = mean_expression), 
+            lty = 3, se = FALSE, color = 'black') +
+  scale_x_continuous(breaks = seq(0.05, 0.3, by=0.05)) +
+  labs(title = "Expressão Média por Taxa (Brauer)", x = "Taxa", 
+       y = "Expressão Média", color = "Nutriente") +
+  theme_classic()
+  
+```
+
+
+f) Salve o gráfico que você acabou de fazer para um arquivo pdf de tamanho 10x6 usando uma função `ggsave()` do pacote `ggplot2`.
+```{r}
+ggsave("novo.pdf", width = 10, height = 6, units = "cm")
+```
+
